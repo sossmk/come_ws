@@ -1,0 +1,23 @@
+# ─── colcon 빌드 산출물 ───────────────────────────
+# 어느 깊이에서든 매칭됨. 과거 src/ 안에서 colcon build를 실행해
+# 이 트리들이 21군데에 중복 생성되며 105MB를 차지한 적이 있음.
+build/
+install/
+log/
+
+# ─── Python ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ─── yolo_ros (중첩 git 저장소, 별도 관리 예정) ────
+# 자체 .git을 가지고 있어 여기서 추적하면 빈 gitlink만 커밋됨.
+# 커스텀 노드(yolo_sign.py, traffic_light_color_detector.py)와
+# best.pt가 들어 있으므로 정합 전까지 별도 백업 필요.
+src/yolo_ros/
+
+# ─── 기타 ────────────────────────────────────────
+*.bak
+.vscode/
+.idea/
