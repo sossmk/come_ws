@@ -7,34 +7,34 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from dynamixel_sdk import PortHandler, PacketHandler
 
-# =================== ê³ ì • ì„¤ì • (ì—¬ê¸°ë§Œ ìˆ˜ì •í•˜ì„¸ìš”) ===================
-DEVICE         = "/dev/ttyUSB0"   # í¬íŠ¸
-BAUDRATE       = 57600            # ë³´ë“œë ˆì´íŠ¸
+# =================== 고정 설정 (여기만 수정하세요) ===================
+DEVICE         = "/dev/ttyUSB0"   # 포트
+BAUDRATE       = 57600            # 보드레이트
 
-ID_LEFT        = 8                # ì™¼ìª½ êµ¬ë™
-ID_RIGHT       = 9                # ì˜¤ë¥¸ìª½ êµ¬ë™
-ID_STEER       = 7                # ì¡°í–¥
+ID_LEFT        = 8                # 왼쪽 구동
+ID_RIGHT       = 9                # 오른쪽 구동
+ID_STEER       = 7                # 조향
 
-# êµ¬ë™ ìµœëŒ€ì†ë„ ì œí•œ(LSB) â€” ë„¤ ëª¨í„°ê°€ Â±200 ê¹Œì§€ í—ˆìš©
+# 구동 최대속도 제한(LSB) — 네 모터가 ±200 까지 허용
 VEL_LSB_LIMIT  = 200
 
-# ë¡œë´‡ ì¹˜ìˆ˜
+# 로봇 치수
 WHEEL_RADIUS   = 0.0325           # m
 WHEEL_BASE     = 0.24             # m
 
-# ì¡°í–¥(ìœ„ì¹˜) íŠœë‹
-STEER_CENTER   = 800             # ì„¼í„° í‹±(12-bit ê¸°ì¤€ ì˜ˆì‹œ)
-STEER_MIN      = 300             # ìµœì†Œ í‹±
-STEER_MAX      = 1300             # ìµœëŒ€ í‹±
-MAX_STEER_DEG  = 25.0             # ìµœëŒ€ ì¡°í–¥ ê°ë„(ë„)
-STEER_DIR      = -1               # ì¢Œìš° ë’¤ì§‘íž˜ ë³´ì •(+1 ë˜ëŠ” -1)
-STEER_GAIN     = 1.0              # ì¡°í–¥ ê°ë„ ìŠ¤ì¼€ì¼(1.0 ê¸°ë³¸)
-USE_CUR_AS_CENTER = False         # Trueë©´ ì‹œìž‘ì‹œ í˜„ìž¬ ìœ„ì¹˜ë¥¼ ì„¼í„°ë¡œ ìž¡ìŒ
+# 조향(위치) 튜닝
+STEER_CENTER   = 800             # 센터 틱(12-bit 기준 예시)
+STEER_MIN      = 300             # 최소 틱
+STEER_MAX      = 1300             # 최대 틱
+MAX_STEER_DEG  = 25.0             # 최대 조향 각도(도)
+STEER_DIR      = -1               # 좌우 뒤집힘 보정(+1 또는 -1)
+STEER_GAIN     = 1.0              # 조향 감도 스케일(1.0 기본)
+USE_CUR_AS_CENTER = False         # True면 시작시 현재 위치를 센터로 잡음
 
-# ì•ˆì „: /cmd_velì´ ëŠê¸°ë©´ ì´ ì‹œê°„(s) ë’¤ ì •ì§€
+# 안전: /cmd_vel이 끊기면 이 시간(s) 뒤 정지
 CMD_TIMEOUT_S  = 0.5
 
-# ì˜¤ë¥¸ìª½ ë°”í€´ ì „ì§„ì€ ìŒìˆ˜(-), ì™¼ìª½ ë°”í€´ ì „ì§„ì€ ì–‘ìˆ˜(+)ë¡œ â€œê³ ì •â€
+# 오른쪽 바퀴 전진은 음수(-), 왼쪽 바퀴 전진은 양수(+)로 “고정”
 # =====================================================================
 
 # ===== Control Table (X-series, Protocol 2.0) =====
@@ -51,7 +51,7 @@ TORQUE_ENABLE = 1
 TORQUE_DISABLE = 0
 
 RPM_PER_LSB   = 0.229
-TICKS_PER_DEG = 1.0 / 0.088      # â‰ˆ 11.36 tick/deg
+TICKS_PER_DEG = 1.0 / 0.088      # ≈ 11.36 tick/deg
 
 def clamp(v, lo, hi): return lo if v < lo else hi if v > hi else v
 
@@ -60,27 +60,27 @@ class DynaCmdVel(Node):
     def __init__(self):
         super().__init__('dyna_cmd_vel')
 
-        # ---- í¬íŠ¸ ì—´ê¸° ----
+        # ---- 포트 열기 ----
         self.port   = PortHandler(DEVICE)
         self.packet = PacketHandler(2.0)
 
         if not self.port.openPort():
-            self.get_logger().error(f'í¬íŠ¸ ì—´ê¸° ì‹¤íŒ¨: {DEVICE}')
+            self.get_logger().error(f'포트 열기 실패: {DEVICE}')
             raise RuntimeError('openPort failed')
         if not self.port.setBaudRate(BAUDRATE):
-            self.get_logger().error(f'ë³´ë“œë ˆì´íŠ¸ ì„¤ì • ì‹¤íŒ¨: {BAUDRATE}')
+            self.get_logger().error(f'보드레이트 설정 실패: {BAUDRATE}')
             raise RuntimeError('setBaudRate failed')
 
-        # ---- ëª¨ë“œ ì„¤ì • ----
+        # ---- 모드 설정 ----
         self._set_mode(ID_LEFT,  MODE_VELOCITY)
         self._set_mode(ID_RIGHT, MODE_VELOCITY)
         self._set_mode(ID_STEER, MODE_POSITION)
 
-        # ---- ì´ˆê¸°ê°’ ----
+        # ---- 초기값 ----
         self._write_vel(ID_LEFT,  0)
         self._write_vel(ID_RIGHT, 0)
 
-        # ìƒíƒœ ì ê²€
+        # 상태 점검
         omL = self._read1(ID_LEFT,  ADDR_OPERATING_MODE)
         omR = self._read1(ID_RIGHT, ADDR_OPERATING_MODE)
         omS = self._read1(ID_STEER, ADDR_OPERATING_MODE)
@@ -91,12 +91,12 @@ class DynaCmdVel(Node):
         self.get_logger().info(
             f'STATUS OM L/R/S={omL}/{omR}/{omS}, TE L/R/S={teL}/{teR}/{teS}, PP S={ppS}')
 
-        # ì„¼í„° ì„¤ì •
+        # 센터 설정
         center = int(ppS) if USE_CUR_AS_CENTER else STEER_CENTER
         self._write_pos(ID_STEER, center)
         self.steer_center = center
 
-        # ---- ROS êµ¬ë…/íƒ€ì´ë¨¸ ----
+        # ---- ROS 구독/타이머 ----
         self.last_cmd_time = self.get_clock().now()
         self.create_subscription(Twist, '/cmd_vel', self.on_cmd_vel, 10)
         self.create_timer(0.05, self.on_timer)
@@ -106,7 +106,7 @@ class DynaCmdVel(Node):
             f'dev={DEVICE} baud={BAUDRATE} limit={VEL_LSB_LIMIT} center={self.steer_center}'
         )
 
-    # ===== ì €ìˆ˜ì¤€ I/O (ì§„ë‹¨ í¬í•¨) =====
+    # ===== 저수준 I/O (진단 포함) =====
     def _write1(self, dxl_id, addr, val):
         comm, dxl_err = self.packet.write1ByteTxRx(self.port, dxl_id, addr, int(val))
         if comm != 0 or dxl_err != 0:
@@ -142,14 +142,14 @@ class DynaCmdVel(Node):
         pos = int(clamp(pos, STEER_MIN, STEER_MAX))
         self._write4(dxl_id, ADDR_GOAL_POSITION, pos)
 
-    # ===== ì½œë°± =====
+    # ===== 콜백 =====
     def on_cmd_vel(self, msg: Twist):
         self.last_cmd_time = self.get_clock().now()
 
         v  = float(msg.linear.x)
         wz = float(msg.angular.z)
 
-        # ---- ì¡°í–¥ (ì •ì§€ì—ì„œë„ ì¡°í–¥ ê°€ëŠ¥) ----
+        # ---- 조향 (정지에서도 조향 가능) ----
         if abs(wz) < 1e-4:
             delta_deg = 0.0
         else:
@@ -162,8 +162,8 @@ class DynaCmdVel(Node):
         steer_ticks = int(self.steer_center + STEER_DIR * delta_deg * TICKS_PER_DEG)
         self._write_pos(ID_STEER, steer_ticks)
 
-        # ---- êµ¬ë™: 8ì€ +ê°€ ì „ì§„, 9ëŠ” -ê°€ ì „ì§„(ê³ ì •) ----
-        if abs(v) < 0.05:   # ~5cm/s ì´í•˜ëŠ” ë°ë“œì¡´
+        # ---- 구동: 8은 +가 전진, 9는 -가 전진(고정) ----
+        if abs(v) < 0.05:   # ~5cm/s 이하는 데드존
             lsbL = 0
             lsbR = 0
         else:
@@ -175,12 +175,12 @@ class DynaCmdVel(Node):
         self._write_vel(ID_LEFT,  lsbL)
         self._write_vel(ID_RIGHT, lsbR)
 
-        # ìƒíƒœ ë¡œê·¸(í˜„ìž¬ì†ë„/í˜„ìž¬ìœ„ì¹˜)
+        # 상태 로그(현재속도/현재위치)
         pvL = self._read4(ID_LEFT,  ADDR_PRESENT_VELOCITY)
         pvR = self._read4(ID_RIGHT, ADDR_PRESENT_VELOCITY)
         ppS = self._read4(ID_STEER,  ADDR_PRESENT_POSITION)
         self.get_logger().info(
-            f'cmd v={v:.2f} w={wz:.2f} â†’ steer={delta_deg:.1f}Â°({steer_ticks}), '
+            f'cmd v={v:.2f} w={wz:.2f} → steer={delta_deg:.1f}°({steer_ticks}), '
             f'LSB L={lsbL} R={lsbR}, PV L={pvL} R={pvR}, PP S={ppS}'
         )
 

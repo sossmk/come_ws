@@ -24,7 +24,7 @@ def generate_launch_description():
     laser_yaw   = LaunchConfiguration('laser_yaw',   default='0.0')
 
     # 오도메 스크립트 경로 (네 odom_from_dxl.py 위치로 바꿔도 됨)
-   odom_script = LaunchConfiguration(
+    odom_script = LaunchConfiguration(
         'odom_script',
         default=str(PathJoinSubstitution([
             '/', 'home', 'kangsanmaru', 'ros2_ws', 'src',

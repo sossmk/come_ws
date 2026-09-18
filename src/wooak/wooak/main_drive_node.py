@@ -208,16 +208,16 @@ class MainDriveNode(Node):
                 self.get_logger().info("Moving~")
 
                 self.drive(1300.0, self.speed_default)
-                time.sleep(4.0)     #ìš°
+                time.sleep(4.0)     #우
  
                 self.drive(300.0,self.speed_default)
-                time.sleep(7.7)     #ì¢Œ -> ë¨¸ë¦¬ ì •ë ¬
+                time.sleep(7.7)     #좌 -> 머리 정렬
 
                 self.drive(1300.0, self.speed_default)
-                time.sleep(2.0)     #ìš° -> ë¨¸ë¦¬ ì •ë ¬
+                time.sleep(2.0)     #우 -> 머리 정렬
 
             else:
-                #ìž¥ì• ë¬¼ ì•ˆë§Œë‚¬ì„ë•Œëž‘ ìž¥ì• ë¬¼ í†µê³¼ í›„ ì–‘ì„ ì°¨ì„  ì£¼í–‰
+                #장애물 안만났을때랑 장애물 통과 후 양선차선 주행
                 steer = 800.0 +self.steer_gain * self.delta_x
                 self.drive(steer, self.speed_default)
 
@@ -227,7 +227,7 @@ class MainDriveNode(Node):
                     self.drive(1000.0, self.speed_default)
                     time.sleep(2.0)
                     self.mode = CONE
-                    self.get_logger().info("Mode 4 End â†’ Mode 5 (CONE) Start")
+                    self.get_logger().info("Mode 4 End → Mode 5 (CONE) Start")
                     self.stop_detected = False
 
         # 라바콘 주행
