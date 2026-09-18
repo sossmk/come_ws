@@ -2,20 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import rclpy
-import os
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import math
-# 다른 부분에서 저장된 델타값 사용할 수 있도록
-from std_msgs.msg import Float32
 from std_msgs.msg import Bool
-import time
 
 
-class LaneDetectionNode(Node):
+class StoplineNode(Node):
     def __init__(self):
         super().__init__('stopline_node')
         self.get_logger().info('stopline Node Started!')
@@ -41,12 +36,6 @@ class LaneDetectionNode(Node):
         # 파라미터
         self.WIDTH = 640
         self.HEIGHT = 480
-        self.prev_x_left = 100
-        self.prev_x_right = 540
-        # x_left_top, x_right_top if문 밖에서 사용하기 위해
-        self.prev_x_left_top = 100
-        self.prev_x_right_top = 540
-        
         # ROI 설정 (중앙 부분만)
         self.roi_center_width = 200  # 중앙 800픽셀만 사용
         self.roi_start_y = int(self.HEIGHT * 0.7) # 0.7
@@ -142,39 +131,15 @@ class LaneDetectionNode(Node):
         #self.stop_find_image_pub.publish(result_msg)
         
     
-        self.get_logger().info(f'stop line: {stop_detected}')
+        # 매 프레임(30Hz) 출력하던 로그 → 0.5초에 한 번
+        self.get_logger().info(f'stop line: {stop_detected}', throttle_duration_sec=0.5)
         
-
-
-    def visualize_lanes(self, image, roi_img, roi_start_x, m_left, m_right):
-        line_draw_img = roi_img.copy()
-        
-        
-        # ROI 영역을 원본 이미지에 합성
-        roi_end_x = roi_start_x + self.roi_center_width
-        image[self.roi_start_y:self.roi_end_y, roi_start_x:roi_end_x] = line_draw_img
-        
-        # ROI 영역 테두리 표시 (녹색 사각형)
-        cv2.rectangle(image, 
-                     (roi_start_x, self.roi_start_y), 
-                     (roi_end_x, self.roi_end_y), 
-                     (100, 100, 0), 2)
-        
-        # ROI 정보 텍스트 표시
-        roi_text = f"ROI: {self.roi_center_width}x{self.roi_height}"
-        cv2.putText(image, roi_text, 
-                   (roi_start_x, self.roi_start_y - 10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        
-        self.publish_result_image(image)
-
-
 
 
 
 def main(args=None):
     rclpy.init(args=args)
-    lane_detection_node = LaneDetectionNode()
+    lane_detection_node = StoplineNode()
     
     
     try:
@@ -183,7 +148,7 @@ def main(args=None):
         pass
     finally:
         lane_detection_node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

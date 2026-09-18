@@ -5,31 +5,15 @@ import rclpy
 import sys
 from rclpy.node import Node
 from std_msgs.msg import Float32
-from dynamixel_sdk import *
+from dynamixel_sdk import PortHandler, PacketHandler
+
+from wooak.dxl_common import (BAUDRATE, ID_LEFT, ID_RIGHT, ID_STEER,
+                              ADDR_TORQUE_ENABLE, ADDR_OPERATING_MODE, ADDR_GOAL_VELOCITY, ADDR_GOAL_POSITION,
+                              MODE_VELOCITY, MODE_POSITION, TORQUE_ENABLE, TORQUE_DISABLE,
+                              STEER_CENTER, STEER_MIN, STEER_MAX)
 
 # ===== 1. 하드웨어 설정 (사용자 로봇에 맞게 수정) =====
 DEVICENAME = '/dev/ttyu2d2'
-BAUDRATE   = 57600
-ID_LEFT    = 8
-ID_RIGHT   = 9
-ID_STEER   = 7
-
-# 제어 테이블 주소 (X-series 기준)
-ADDR_TORQUE_ENABLE    = 64
-ADDR_OPERATING_MODE   = 11
-ADDR_GOAL_VELOCITY    = 104
-ADDR_GOAL_POSITION    = 116
-
-# 동작 모드
-MODE_VELOCITY = 1
-MODE_POSITION = 3
-TORQUE_ENABLE = 1
-TORQUE_DISABLE = 0
-
-# 조향 파라미터 (사용자 로봇에 맞게 수정)
-STEER_CENTER   = 800
-STEER_MIN      = STEER_CENTER - 500
-STEER_MAX      = STEER_CENTER + 500
 
 class MotorDriverNode(Node):
     def __init__(self):
@@ -61,10 +45,8 @@ class MotorDriverNode(Node):
 
     def angle_callback(self, msg):
         """수신된 angle 값으로 조향 모터 목표 위치(position)를 계산합니다."""
-        # angle_gain: ROS angle 값(보통 -50 ~ 50)을 다이나믹셀 position 값으로 변환하는 비율.
-        # 이 값은 테스트를 통해 직접 튜닝해야 합니다.
-        angle_gain = 5.0
-        self.target_position = (msg.data)
+        # main_drive_node 가 이미 다이나믹셀 position 값(300~1300)으로 보내므로 그대로 사용
+        self.target_position = msg.data
         self.apply_command()
         self.get_logger().info(f"현재 조향값: {self.target_position:.1f}")
 
@@ -119,7 +101,7 @@ def main(args=None):
     finally:
         motor_driver_node.on_shutdown()
         motor_driver_node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

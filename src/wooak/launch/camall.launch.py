@@ -1,6 +1,5 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
 
 def generate_launch_description():
     return LaunchDescription([
@@ -23,44 +22,33 @@ def generate_launch_description():
             }]
         ),
 
-        # 2️⃣ 차선 인식 파이썬 노드 (직접 실행)
-        ExecuteProcess(
-            cmd=[
-                'python3',
-                '/home/kkk/come_ws/src/wooak/wooak/lane_detection_node.py',
-                '--ros-args',
-                '--remap', '/camera/image_raw:=/image_raw'
-            ],
+        # 2️⃣ 차선 인식 / 정지선 노드
+        #    (원래 /home/kkk/... 절대경로를 python3 로 직접 실행 → 다른 PC 에서 안 돌아감)
+        Node(
+            package='wooak',
+            executable='lane_detection_node',
+            name='lane_detection_node',
             output='screen'
         ),
         
-        ExecuteProcess(
-            cmd=[
-                'python3',
-                '/home/kkk/come_ws/src/wooak/wooak/stopline_find.py',
-                '--ros-args',
-                '--remap', '/camera/image_raw:=/image_raw'
-            ],
+        Node(
+            package='wooak',
+            executable='stopline_find',
+            name='stopline_find',
             output='screen'
         ),
 
-        ExecuteProcess(
-            cmd=[
-                'python3',
-                '/home/kkk/come_ws/src/wooak/wooak/left_lane_detection_node.py',
-                '--ros-args',
-                '--remap', '/camera/image_raw:=/image_raw'
-            ],
+        Node(
+            package='wooak',
+            executable='left_lane_detection_node',
+            name='left_lane_detection_node',
             output='screen'
         ),
         
-        ExecuteProcess(
-            cmd=[
-                'python3',
-                '/home/kkk/come_ws/src/wooak/wooak/right_lane_detection_node.py',
-                '--ros-args',
-                '--remap', '/camera/image_raw:=/image_raw'
-            ],
+        Node(
+            package='wooak',
+            executable='right_lane_detection_node',
+            name='right_lane_detection_node',
             output='screen'
         ),
         

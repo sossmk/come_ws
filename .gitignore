@@ -21,3 +21,6 @@ src/yolo_ros/
 *.bak
 .vscode/
 .idea/
+
+# understand-anything 산출물
+.ua/

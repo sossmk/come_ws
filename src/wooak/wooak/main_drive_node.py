@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32, Bool, String, Float32MultiArray, Int32
-import math
+from std_msgs.msg import Float32, Bool, Int32
 import time
 
 
@@ -18,6 +17,8 @@ PARKING        = 6
 PARKOUT        = 7
 MAZE           = 8
 FINISH         = 9
+
+STEER_CENTER   = 800.0   # 조향 중앙값 (다이나믹셀 position)
 
 class MainDriveNode(Node):
     def __init__(self, start_mode=1):
@@ -43,6 +44,11 @@ class MainDriveNode(Node):
         self.cone_done = 0
         self.maze_done = 0
         self.parkinflag=0
+
+        # 모드 진입 시각 (원래 hasattr 로 처음 진입 여부를 확인하던 값들)
+        self.second_drive_start = None
+        self.fixed_direction = None  # 방향 아직 없음
+        self.parkin_drive_start = None
 
 
 
@@ -115,6 +121,12 @@ class MainDriveNode(Node):
     def cone_done_callback(self,msg):
         self.cone_done = msg.data
     # =================== 모터 제어 ===================
+    def lane_steer(self, delta, gain=None):
+        """차선 delta_x → 조향값 (STEER_CENTER + gain * delta)"""
+        if gain is None:
+            gain = self.steer_gain
+        return STEER_CENTER + gain * delta
+
     def drive(self, angle, speed):
         self.angle_pub.publish(Float32(data=angle))
         self.speed_pub.publish(Float32(data=speed))
@@ -127,32 +139,32 @@ class MainDriveNode(Node):
 
     # =================== 메인 루프 ===================
     def main_loop(self):
+        # ※ 모드 로그는 50Hz 로 찍혀서 throttle_duration_sec=0.5 로 줄임
+        # ※ time.sleep 이 타이머 콜백 안에 있어 그동안 센서 콜백이 멈춤 (보고서 참고, 튜닝 때문에 유지)
         # =================== 모드 분기 ===================
 
         if self.mode== First_drive: 
             if self.obstacle_direction2 == 1 :
                 self.stop_car()
             else:
-                self.get_logger().info("Mode: First_drive")
-                steer = 800.0 + self.steer_gain * self.right_delta_x
+                self.get_logger().info("Mode: First_drive", throttle_duration_sec=0.5)
+                steer = self.lane_steer(self.right_delta_x)
                 self.drive(steer, self.speed_default)
 
                 if self.stop_detected:
-                    self.get_logger().info("stopline detected")
+                    self.get_logger().info("stopline detected", throttle_duration_sec=0.5)
                     self.stop_car(4.0)
                     self.mode = Second_drive
-                    self.get_logger().info("Second Drive Start")
+                    self.get_logger().info("Second Drive Start", throttle_duration_sec=0.5)
                     self.stop_detected = False
             
 
         #전방 장애물이 있으면 오른쪽 차선 주행, 없으면 왼쪽 차선 추행 -> 몇초간 그냥 차선 주행만 하다가 전방 장애물 만나면 1초간 정지 -> 다시 차선 주행 후 정지선 인식하면 정지
         elif self.mode == Second_drive:
-            self.get_logger().info("Mode: Second_drive")
-
+            self.get_logger().info("Mode: Second_drive", throttle_duration_sec=0.5)
             # 처음 진입 시 시작 시간 기록
-            if not hasattr(self, 'second_drive_start'):
+            if self.second_drive_start is None:
                 self.second_drive_start = time.monotonic()
-                self.fixed_direction = None  # 방향 아직 없음
 
             elapsed = time.monotonic() - self.second_drive_start
 
@@ -160,118 +172,110 @@ class MainDriveNode(Node):
             if self.fixed_direction is None and self.obstacle_direction1 in [0, 1]:
                 self.fixed_direction = self.obstacle_direction1
                 if self.fixed_direction == 1:
-                    self.get_logger().info("🟢 첫 장애물 → 오른쪽 방향 고정")
+                    self.get_logger().info("🟢 첫 장애물 → 오른쪽 방향 고정", throttle_duration_sec=0.5)
                 else:
-                    self.get_logger().info("🟢 첫 장애물 → 왼쪽 방향 고정")
-
+                    self.get_logger().info("🟢 첫 장애물 → 왼쪽 방향 고정", throttle_duration_sec=0.5)
             # 30초 동안 장애물 무시 주행
             if elapsed < 30.0:
-                self.get_logger().info(f"⚠️ 장애물 감지 무시 중 ({elapsed:.1f}s/30s)")
-
+                self.get_logger().info(f"⚠️ 장애물 감지 무시 중 ({elapsed:.1f}s/30s)", throttle_duration_sec=0.5)
                 # 방향이 고정된 경우 해당 방향으로만 주행
                 if self.fixed_direction == 1:
-                    self.get_logger().info("Right lane 유지 중")
-                    steer = 800.0 + ((self.steer_gain+0.5) * self.right_delta_x)
+                    self.get_logger().info("Right lane 유지 중", throttle_duration_sec=0.5)
+                    steer = self.lane_steer(self.right_delta_x, self.steer_gain + 0.5)
                 elif self.fixed_direction == 0:
-                    self.get_logger().info("Left lane 유지 중")
-                    steer = 800.0 + ((self.steer_gain + 0.5) * self.right_delta_x)
+                    self.get_logger().info("Left lane 유지 중", throttle_duration_sec=0.5)
+                    steer = self.lane_steer(self.right_delta_x, self.steer_gain + 0.5)  # ※ 원본도 right_delta (보고서 참고)
                 else:
-                    steer = 800.0  # 초기값 (아직 감지 안 됨)
+                    steer = STEER_CENTER  # 초기값 (아직 감지 안 됨)
 
                 self.drive(steer, self.speed_default)
 
 
             else:  # 30초 지나면 정상 주행
                 if self.stop_detected:
-                    self.get_logger().info("stopline detected")
+                    self.get_logger().info("stopline detected", throttle_duration_sec=0.5)
                     self.stop_car(2.0)
                     self.mode = OBSTACLE
-                    self.get_logger().info("Mode change → OBSTACLE")
+                    self.get_logger().info("Mode change → OBSTACLE", throttle_duration_sec=0.5)
                     self.stop_detected = False
 
                 else :
                     if self.obstacle_direction == 1 and self.middle_object_flag==0:
-                        self.get_logger().info("middle_object_detected ")
+                        self.get_logger().info("middle_object_detected ", throttle_duration_sec=0.5)
                         self.middle_object_flag=1
                         self.stop_car(2.0)
 
                     elif self.obstacle_direction == 0:
-                        steer = 800.0 + self.steer_gain * self.left_delta_x
+                        steer = self.lane_steer(self.left_delta_x)
                         self.drive(steer, self.speed_default)
 
         # 정지선에서 먼저 양쪽차선 검출 주행 -> 장애물 만나면 노드 실행 -> 장애물 지나면 다시 양쪽 차선 주행 -> 정지선 만나면 정지
         elif self.mode == OBSTACLE:
-            self.get_logger().info("Mode 3: OBSTACLE")
-
+            self.get_logger().info("Mode 3: OBSTACLE", throttle_duration_sec=0.5)
             if self.obstacle_direction == 1 and self.obstacle_flag==0:
                 self.obstacle_flag=1
-                self.get_logger().info("Moving~")
-
+                self.get_logger().info("Moving~", throttle_duration_sec=0.5)
                 self.drive(1300.0, self.speed_default)
-                time.sleep(4.0)     #ìš°
+                time.sleep(4.0)     #우
  
                 self.drive(300.0,self.speed_default)
-                time.sleep(7.7)     #ì¢Œ -> ë¨¸ë¦¬ ì •ë ¬
+                time.sleep(7.7)     #좌 -> 머리 정렬
 
                 self.drive(1300.0, self.speed_default)
-                time.sleep(2.0)     #ìš° -> ë¨¸ë¦¬ ì •ë ¬
+                time.sleep(2.0)     #우 -> 머리 정렬
 
             else:
-                #ìž¥ì• ë¬¼ ì•ˆë§Œë‚¬ì„ë•Œëž‘ ìž¥ì• ë¬¼ í†µê³¼ í›„ ì–‘ì„ ì°¨ì„  ì£¼í–‰
-                steer = 800.0 +self.steer_gain * self.delta_x
+                #장애물 안만났을때랑 장애물 통과 후 양선차선 주행
+                steer = self.lane_steer(self.delta_x)
                 self.drive(steer, self.speed_default)
 
                 if self.stop_detected and self.obstacle_flag==1:
-                    self.get_logger().info("stopline detected")
+                    self.get_logger().info("stopline detected", throttle_duration_sec=0.5)
                     self.stop_car(2.0)
                     self.drive(1000.0, self.speed_default)
                     time.sleep(2.0)
                     self.mode = CONE
-                    self.get_logger().info("Mode 4 End â†’ Mode 5 (CONE) Start")
+                    self.get_logger().info("Mode 4 End → Mode 5 (CONE) Start", throttle_duration_sec=0.5)
                     self.stop_detected = False
 
         # 라바콘 주행
         elif self.mode == CONE:
-            self.get_logger().info("Mode 4: CONE")
-            
+            self.get_logger().info("Mode 4: CONE", throttle_duration_sec=0.5)
             if self.obstacle_direction1==1:
-                self.get_logger().info("lidar drive")
-
+                self.get_logger().info("lidar drive", throttle_duration_sec=0.5)
                 steer = self.lidar_angle
                 self.drive(steer,self.speed_default)
             else:
-                steer = 800.0+self.steer_gain * self.left_delta_x
+                steer = self.lane_steer(self.left_delta_x)
                 self.drive(steer, self.speed_default)
-                self.get_logger().info("lane drive")
-
+                self.get_logger().info("lane drive", throttle_duration_sec=0.5)
                 if self.stop_detected:
-                    self.get_logger().info("stopline detected")
+                    self.get_logger().info("stopline detected", throttle_duration_sec=0.5)
                     self.stop_car(2.0)
                     self.mode = PARKIN
-                    self.get_logger().info("PARKING Start")
+                    self.get_logger().info("PARKING Start", throttle_duration_sec=0.5)
                     self.stop_detected = False
         
         # 라바콘 주행 끝나고 다음 정지선 넘을때 까지 하드코딩 우회전 -> 왼쪽 차선 주행 -> 노란 정지선 만나면 주차 노드 실행 -> 나와서 왼쪽 차선 주행 후 정지선 인식 후 정지
         elif self.mode == PARKIN:
-            self.get_logger().info("Mode 5: PARKIN")
-            
-            if not hasattr(self, 'parkin_drive_start'):
+            self.get_logger().info("Mode 5: PARKIN", throttle_duration_sec=0.5)
+            if self.parkin_drive_start is None:
                 self.parkin_drive_start = time.monotonic()
 
             elapsed10 = time.monotonic() - self.parkin_drive_start
 
             if elapsed10 <5.0 :
-                self.get_logger().info("right lane")
+                self.get_logger().info("right lane", throttle_duration_sec=0.5)
                 self.drive(1300, self.speed_default)
 
             elif elapsed10 <15.0 and elapsed10 >5.0:
-                self.get_logger().info("right lane")
-                steer = 800.0+self.steer_gain * self.right_delta_x
+                self.get_logger().info("right lane", throttle_duration_sec=0.5)
+                steer = self.lane_steer(self.right_delta_x)
                 self.drive(steer, self.speed_default)
 
             else :
-                self.get_logger().info("left lane")
-                steer = 800.0+self.steer_gain * self.left_delta_x
+                self.get_logger().info("left lane", throttle_duration_sec=0.5)
+                steer = self.lane_steer(self.left_delta_x)
                 self.drive(steer, self.speed_default)
             
                 if self.stop_detected:
@@ -279,8 +283,8 @@ class MainDriveNode(Node):
                     self.mode = PARKING
             
         elif self.mode == PARKING:
-            self.get_logger().info("Mode 6: PARKINg")
-            steer = 800.0
+            self.get_logger().info("Mode 6: PARKINg", throttle_duration_sec=0.5)
+            steer = STEER_CENTER
             self.drive(steer, 200.0)
             time.sleep(1.0)
             steer = 1300.0
@@ -290,57 +294,57 @@ class MainDriveNode(Node):
             self.mode = PARKOUT
 
         elif self.mode == PARKOUT:
-            self.get_logger().info("Mode 6: parkout")
-            self.parkout_flag=0
+            self.get_logger().info("Mode 6: parkout", throttle_duration_sec=0.5)
+            # 원래 여기서 매 틱마다 parkout_flag=0 으로 초기화 → 2초 좌회전만 무한 반복하던 버그
+            # parkout_flag 는 __init__ 에서 0 으로 한 번만 초기화
             if self.parkout_flag==0:
-                self.get_logger().info("Mode 6: flag0")
+                self.get_logger().info("Mode 6: flag0", throttle_duration_sec=0.5)
                 self.parkout_flag=1
                 steer = 300.0
                 self.drive(steer,200.0)
                 time.sleep(2.0)
 
             if self.parkout_flag==1:
-                self.get_logger().info("Mode 6: flag1")
+                self.get_logger().info("Mode 6: flag1", throttle_duration_sec=0.5)
                 if self.stop_detected:
                     self.parkout_flag=2
                     self.stop_car(1.0)
                 else: 
-                    steer = 800.0 +self.steer_gain * self.right_delta_x
+                    steer = self.lane_steer(self.right_delta_x)
                     self.drive(steer, self.speed_default)
             
             if self.parkout_flag==2:
-                self.get_logger().info("Mode 6: flag2")
+                self.get_logger().info("Mode 6: flag2", throttle_duration_sec=0.5)
                 if self.stop_detected:
                     self.parkout_flag=3
                 else:
-                    steer = 800.0 +self.steer_gain * self.right_delta_x
+                    steer = self.lane_steer(self.right_delta_x)
                     self.drive(steer, self.speed_default)
 
             if self.parkout_flag==3:
-                self.get_logger().info("Mode 6: flag3")
+                self.get_logger().info("Mode 6: flag3", throttle_duration_sec=0.5)
                 if self.stop_detected:
                     self.stop_car(2.0)
                     self.mode = MAZE
-                    self.get_logger().info("go to maze")
+                    self.get_logger().info("go to maze", throttle_duration_sec=0.5)
                     self.stop_detected = False
                 else:
-                    steer = 800.0 +self.steer_gain * self.right_delta_x
+                    steer = self.lane_steer(self.right_delta_x)
                     self.drive(steer, self.speed_default)
 
             
         # 주차 정지선에서부터 우회전 하드코딩 -> 미로 주행 -> 왼쪽차선 주행 -> 정지선 만나면 정지
         elif self.mode == MAZE:
-            self.get_logger().info("Mode 4: maze")
-            
+            self.get_logger().info("Mode 4: maze", throttle_duration_sec=0.5)
             if self.obstacle_direction1==1:
-                self.get_logger().info("lidar drive")
-
-                steer = self.lidar_angle
+                self.get_logger().info("lidar drive", throttle_duration_sec=0.5)
+                # maze_drive 가 이제 /maze_steer 로 발행 (원래 /lidar_steer 를 lidar_drive 와 같이 써서 값이 섞였음)
+                steer = self.maze_steer
                 self.drive(steer,self.speed_default)
-        
+
         # 정지선에서 왼쪽 장애물인지 오른쪽 장애물인지 판단 후 좌회전 or 우회전 하드코딩
         elif self.mode == FINISH:
-            self.get_logger().info("Mode 7: FINal drive")
+            self.get_logger().info("Mode 7: FINal drive", throttle_duration_sec=0.5)
             self.drive(1300, self.speed_default)
             time.sleep(3.0)
             self.stop_car()
@@ -358,7 +362,7 @@ def main(args=None):
         node.get_logger().info("Node stopped by user")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()  # Jazzy: Ctrl+C 시 이미 shutdown 된 상태라 shutdown() 은 예외
 
 
 if __name__ == '__main__':
