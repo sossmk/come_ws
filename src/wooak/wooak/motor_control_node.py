@@ -3,31 +3,17 @@
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
-from dynamixel_sdk import *
-import math
-import Float32
+from std_msgs.msg import Float32, Float32MultiArray   # 원래 `import Float32` → ImportError 로 노드가 안 떴음
+from dynamixel_sdk import PortHandler, PacketHandler
+
+from wooak.dxl_common import (BAUDRATE, ADDR_TORQUE_ENABLE, ADDR_OPERATING_MODE,
+                              ADDR_GOAL_VELOCITY, ADDR_GOAL_POSITION, TORQUE_ENABLE,
+                              MODE_VELOCITY, MODE_POSITION, ID_STEER, ID_LEFT, ID_RIGHT, VEL_LIMIT)
+from wooak.lidar_common import (STEER_CENTER, STEER_STEP, N_MIN, N_MAX, idx,
+                                valid_ranges, zone_min, zone_argmin, clamp_steer)
 
 # ======== Dynamixel 설정 ========
 DEVICENAME = '/dev/ttyUSB1'
-BAUDRATE = 57600
-
-ADDR_TORQUE_ENABLE = 64
-ADDR_OPERATING_MODE = 11
-ADDR_GOAL_VELOCITY = 104
-ADDR_GOAL_POSITION = 116
-
-TORQUE_ENABLE = 1
-MODE_VELOCITY = 1
-MODE_POSITION = 3
-
-ID_STEER = 7
-ID_LEFT = 8
-ID_RIGHT = 9
-
-VEL_LIMIT = 200
-STEER_CENTER = 800
-STEER_STEP = 3.125   # 인덱스 차이당 조향 변화량
 # =================================
 
 
@@ -65,26 +51,26 @@ class MotorControlNode(Node):
         n = len(ranges)
 
         # ===== YDLIDAR G6 데이터 유효성 =====
-        if n < 1800 or n > 1900:
+        if n < N_MIN or n > N_MAX:
             self.get_logger().warn(f"⚠️ 예상 인덱스(약 1860)와 다름: {n}")
             return
 
         # ===== 구역 설정 (0~1860 인덱스 기준) =====
-        right_indices  = list(range(1550, 1700))
-        center_indices = list(range(1700, 1860)) + list(range(0, 100))
-        left_indices   = list(range(100, 250))
+        right_indices  = idx((1550, 1700))
+        center_indices = idx((1700, 1860), (0, 100))
+        left_indices   = idx((100, 250))
 
         # ===== 거리 유효성 검증 =====
-        ranges_valid = [20.0 if (r <= 0.1 or r > 16.0 or math.isnan(r)) else r for r in ranges]
+        ranges_valid = valid_ranges(ranges)
 
         # ===== 각 영역 최소값 =====
-        right_min_val  = min(ranges_valid[i] for i in right_indices)
-        center_min_val = min(ranges_valid[i] for i in center_indices)
-        left_min_val   = min(ranges_valid[i] for i in left_indices)
+        right_min_val  = zone_min(ranges_valid, right_indices)
+        center_min_val = zone_min(ranges_valid, center_indices)
+        left_min_val   = zone_min(ranges_valid, left_indices)
 
         # ===== 최소값 인덱스 =====
-        right_min_idx  = min(right_indices, key=lambda i: ranges_valid[i])
-        left_min_idx   = min(left_indices, key=lambda i: ranges_valid[i])
+        right_min_idx  = zone_argmin(ranges_valid, right_indices)
+        left_min_idx   = zone_argmin(ranges_valid, left_indices)
 
         # ===== 기본 설정 =====
         steer_pos = STEER_CENTER
@@ -92,10 +78,8 @@ class MotorControlNode(Node):
         state = "🟢 Straight"
 
         # ===== 전방 하위 영역 =====
-        front_left_indices  = list(range(1750, 1860))
-        front_right_indices = list(range(0, 110))
-        front_left_min  = min(ranges_valid[i] for i in front_left_indices)
-        front_right_min = min(ranges_valid[i] for i in front_right_indices)
+        front_left_min  = zone_min(ranges_valid, idx((1750, 1860)))
+        front_right_min = zone_min(ranges_valid, idx((0, 110)))
 
         # ===== 주행 제어 로직 =====
         if (right_min_val < 0.5 or center_min_val < 0.6 or left_min_val < 0.5):
@@ -129,7 +113,7 @@ class MotorControlNode(Node):
             state = "🟢 Straight Drive"
 
         # ===== 조향 한계 제한 =====
-        steer_pos = max(min(steer_pos, 1300), 300)
+        steer_pos = clamp_steer(steer_pos)
 
         # ===== 오른쪽 모터 반전 =====
         v_right = -v_right
@@ -143,7 +127,7 @@ class MotorControlNode(Node):
                 int(vel) if vel >= 0 else int(vel + 2**32)
             )
         
-        self.lidar_angle_pub.publish(Float32(data=steer_pos))
+        self.lidar_angle_pub.publish(Float32(data=float(steer_pos)))
 
         # ===== 터미널 출력 =====
         self.get_logger().info(
