@@ -17,11 +17,16 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
-  
-  <exec_depend>rclpy</exec_depend>
+
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <!-- 센서 드라이버 (launch 에서 사용) -->
+  <exec_depend>usb_cam</exec_depend>
+  <exec_depend>ydlidar_ros2_driver</exec_depend>
 
   <!-- 메시지/SLAM 관련 -->
   <exec_depend>nav_msgs</exec_depend>

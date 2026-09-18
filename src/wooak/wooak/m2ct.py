@@ -101,7 +101,7 @@ def main(args=None):
     finally:
         motor_driver_node.on_shutdown()
         motor_driver_node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

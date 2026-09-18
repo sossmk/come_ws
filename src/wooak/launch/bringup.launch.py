@@ -14,7 +14,7 @@ def generate_launch_description():
         # 2️⃣ 라이다 데이터 기반으로 조향/속도 명령 생성
         Node(
             package='wooak',   # lidar_drive_node 가 들어있는 패키지명
-            executable='lidar_drive',
+            executable='lidar_drive.py',   # 원래 'lidar_drive' (없는 실행파일)
             name='lidar_drive',
             output='screen',
         ),

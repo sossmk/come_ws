@@ -8,6 +8,8 @@ from std_msgs.msg import Float32MultiArray
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 import math, time
 
+from wooak.lidar_common import NUM_BINS
+
 
 class LidarArrayNode(Node):
     def __init__(self):
@@ -24,7 +26,7 @@ class LidarArrayNode(Node):
         self.pub = self.create_publisher(Float32MultiArray, '/lidar_array', 10)
 
         # ✅ G6는 약 1860포인트
-        self.num_bins = 1860
+        self.num_bins = NUM_BINS
         self.last_log_time = 0.0  # 로그 주기 제어용 타이머
 
         self.get_logger().info(f"✅ LidarArrayNode started for YDLIDAR G6 ({self.num_bins} bins)")
@@ -53,7 +55,7 @@ class LidarArrayNode(Node):
         self.pub.publish(arr_msg)
 
         # 전방(0도 기준) 거리 표시 — 1초에 한 번만 로그
-        front = resampled[930]
+        front = resampled[self.num_bins // 2]
         now = time.time()
         if now - self.last_log_time > 1.0:
             self.get_logger().info(f"[G6] Front distance: {front:.2f} m")
@@ -69,7 +71,7 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
