@@ -229,7 +229,7 @@ ros2 launch wooak debug_view.launch.py                           # (다른 터�
 |---|---|
 | `camall` | `ros2 launch wooak camall.launch.py` |
 | `lidarall` | 라이다 관련 launch |
-| `start_cam` | usb_cam 단독 실행 (⚠️ 노출 40, `brightness` 설정 없음 → launch와 값이 다름) |
+| ~~`start_cam`~~ | 2026-10-25 주석 처리. brightness 50이 카메라에 남아 이후 `camall`까지 하얗게 떴음. 2-1의 명령을 쓸 것 |
 | `start_viewer` | rqt_image_view |
 | `start_lane` / `left` / `right` / `start_stop` | 차선/정지선 노드 단독 실행 |
 | `drive` / `motor` | 주행 FSM / 모터 노드 단독 실행 |
