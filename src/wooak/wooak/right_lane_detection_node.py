@@ -100,11 +100,12 @@ class LaneDetectionNode(Node):
         yellow_enhanced = cv2.add(r,g)
         yellow_enhanced = cv2.subtract(yellow_enhanced, cv2.multiply(b,1.3))
         yellow_enhanced = np.clip(yellow_enhanced,0,255).astype(np.uint8)
-        blur_mask_y = cv2.GaussianBlur(yellow_enhanced,(5,5),0)
+        yellow_blur = cv2.GaussianBlur(yellow_enhanced,(5,5),0)
 
-        gray_mask = cv2.adaptiveThreshold(blur_mask_y, 255,
+        gray_mask = cv2.adaptiveThreshold(yellow_blur, 255,
                                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                   cv2.THRESH_BINARY, 55,16)
+                                   cv2.THRESH_BINARY, 61, -20)
+        blur_mask_y = cv2.GaussianBlur(gray_mask,(5,5),0)
         edge_img_y = cv2.Canny(blur_mask_y, 100, 140)
         ##ksm추가 코드... 여기부터
         #self.gary_pub.publish(self.bridge.cv2_to_imgmsg(,"mono8")) ? gray가 없네

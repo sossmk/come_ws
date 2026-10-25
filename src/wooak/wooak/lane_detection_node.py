@@ -100,7 +100,7 @@ class LaneDetectionNode(Node):
         gray_img = cv2.cvtColor(roi_img,cv2.COLOR_BGR2GRAY)
         gray_mask = cv2.adaptiveThreshold(gray_img, 255, 
                                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY, 45, -3)
+                                   cv2.THRESH_BINARY, 61, -20)
 
         blur_mask_y = cv2.GaussianBlur(gray_mask,(5,5),0)
         edge_img_y = cv2.Canny(blur_mask_y, 100, 140)

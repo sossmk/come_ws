@@ -98,11 +98,12 @@ class LaneDetectionNode(Node):
         yellow_enhanced = cv2.add(r,g)
         yellow_enhanced = cv2.subtract(yellow_enhanced, cv2.multiply(b,1.6))
         yellow_enhanced = np.clip(yellow_enhanced,0,255).astype(np.uint8)
-        blur_mask_y = cv2.GaussianBlur(yellow_enhanced,(5,5),0)
+        yellow_blur = cv2.GaussianBlur(yellow_enhanced,(5,5),0)
 
-        gray_mask = cv2.adaptiveThreshold(blur_mask_y, 255,
+        gray_mask = cv2.adaptiveThreshold(yellow_blur, 255,
                                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                   cv2.THRESH_BINARY, 55, 16)
+                                   cv2.THRESH_BINARY, 61, -20)
+        blur_mask_y = cv2.GaussianBlur(gray_mask,(5,5),0)
         edge_img_y = cv2.Canny(blur_mask_y, 100, 140)
 
         #추가
