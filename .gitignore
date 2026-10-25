@@ -21,3 +21,6 @@ src/yolo_ros/
 *.bak
 .vscode/
 .idea/
+
+# ─── archify 작업 파일 (초안·검사 기록, 결과물은 EXPERIMENT_GUIDE.html) ───
+.archify/
