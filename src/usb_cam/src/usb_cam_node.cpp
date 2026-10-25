@@ -323,35 +323,35 @@ void UsbCamNode::set_v4l2_params()
 
   // check auto white balance
   if (m_parameters.auto_white_balance) {
-    m_camera->set_v4l_parameter("white_balance_temperature_auto", 1);
-    RCLCPP_INFO(this->get_logger(), "Setting 'white_balance_temperature_auto' to %d", 1);
+    m_camera->set_v4l_parameter("white_balance_automatic", 1);
+    RCLCPP_INFO(this->get_logger(), "Setting 'white_balance_automatic' to %d", 1);
   } else {
     RCLCPP_INFO(this->get_logger(), "Setting 'white_balance' to %d", m_parameters.white_balance);
-    m_camera->set_v4l_parameter("white_balance_temperature_auto", 0);
+    m_camera->set_v4l_parameter("white_balance_automatic", 0);
     m_camera->set_v4l_parameter("white_balance_temperature", m_parameters.white_balance);
   }
 
   // check auto exposure
   if (!m_parameters.autoexposure) {
-    RCLCPP_INFO(this->get_logger(), "Setting 'exposure_auto' to %d", 1);
+    RCLCPP_INFO(this->get_logger(), "Setting 'auto_exposure' to %d", 1);
     RCLCPP_INFO(this->get_logger(), "Setting 'exposure' to %d", m_parameters.exposure);
     // turn down exposure control (from max of 3)
-    m_camera->set_v4l_parameter("exposure_auto", 1);
+    m_camera->set_v4l_parameter("auto_exposure", 1);
     // change the exposure level
-    m_camera->set_v4l_parameter("exposure_absolute", m_parameters.exposure);
+    m_camera->set_v4l_parameter("exposure_time_absolute", m_parameters.exposure);
   } else {
-    RCLCPP_INFO(this->get_logger(), "Setting 'exposure_auto' to %d", 3);
-    m_camera->set_v4l_parameter("exposure_auto", 3);
+    RCLCPP_INFO(this->get_logger(), "Setting 'auto_exposure' to %d", 3);
+    m_camera->set_v4l_parameter("auto_exposure", 3);
   }
 
   // check auto focus
   if (m_parameters.autofocus) {
     m_camera->set_auto_focus(1);
-    RCLCPP_INFO(this->get_logger(), "Setting 'focus_auto' to %d", 1);
-    m_camera->set_v4l_parameter("focus_auto", 1);
+    RCLCPP_INFO(this->get_logger(), "Setting 'focus_automatic_continuous' to %d", 1);
+    m_camera->set_v4l_parameter("focus_automatic_continuous", 1);
   } else {
-    RCLCPP_INFO(this->get_logger(), "Setting 'focus_auto' to %d", 0);
-    m_camera->set_v4l_parameter("focus_auto", 0);
+    RCLCPP_INFO(this->get_logger(), "Setting 'focus_automatic_continuous' to %d", 0);
+    m_camera->set_v4l_parameter("focus_automatic_continuous", 0);
     if (m_parameters.focus >= 0) {
       RCLCPP_INFO(this->get_logger(), "Setting 'focus_absolute' to %d", m_parameters.focus);
       m_camera->set_v4l_parameter("focus_absolute", m_parameters.focus);
