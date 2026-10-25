@@ -20,7 +20,7 @@ m2ct(모터 구동), choice/choice1/choice2(라이다 장애물 판단), main_dr
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -55,7 +55,14 @@ def generate_launch_description():
             'autoexposure': False,
             'exposure': 60,
             'auto_white_balance': False,
+            'brightness': -1,  # usb_cam 기본값 50이 화면을 하얗게 띄움, -1 = 카메라 값 유지
         }],
+    )
+
+    # usb_cam에 해당 파라미터가 없어 v4l2-ctl로 직접 설정 (역광 보정이 유광 시트 반사를 키움)
+    backlight_off = ExecuteProcess(
+        cmd=['v4l2-ctl', '-d', '/dev/video0', '-c', 'backlight_compensation=0'],
+        output='screen',
     )
 
     # 2) 라이다
@@ -121,6 +128,7 @@ def generate_launch_description():
         start_mode_arg,
         camera_fps_arg,
         usb_cam_node,
+        backlight_off,
         ydlidar_node,
         *vision_nodes,
         *lidar_logic_nodes,

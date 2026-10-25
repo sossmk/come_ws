@@ -19,8 +19,15 @@ def generate_launch_description():
                 'io_method': 'mmap',            # ✅ 추가!
                 'autoexposure': False,          # ✅ 추가!
                 'exposure': 60,                 # ✅ 추가!
-                'auto_white_balance': False     # ✅ 추가!
+                'auto_white_balance': False,    # ✅ 추가!
+                'brightness': -1                # usb_cam 기본값 50이 화면을 하얗게 띄움, -1 = 카메라 값 유지
             }]
+        ),
+
+        # usb_cam에 해당 파라미터가 없어 v4l2-ctl로 직접 설정 (역광 보정이 유광 시트 반사를 키움)
+        ExecuteProcess(
+            cmd=['v4l2-ctl', '-d', '/dev/video0', '-c', 'backlight_compensation=0'],
+            output='screen'
         ),
 
         # 2️⃣ 차선 인식 파이썬 노드 (직접 실행)
