@@ -12,12 +12,19 @@ STEER_CENTER = 800
 STEER_STEP = 3.125   # 인덱스 차이당 조향 변화량
 # =================================
 
-class LidarDriveNode(Node):
+# main_drive_node.py의 모드 상수와 동일해야 함 (MAZE 모드일 때만 조향을 발행)
+MAZE_MODE = 8
+
+class MazeDriveNode(Node):
     def __init__(self):
-        super().__init__('lidar_drive_node')
+        super().__init__('maze_drive_node')
 
         # LiDAR 배열 구독
         self.sub = self.create_subscription(Float32MultiArray, '/lidar_array', self.lidar_callback, 10)
+
+        # main_drive_node가 현재 모드를 브로드캐스트하는 토픽 (lidar_drive와 /lidar_steer 충돌 방지용)
+        self.mode_sub = self.create_subscription(Int32, '/drive_mode', self.mode_callback, 10)
+        self.current_mode = MAZE_MODE
 
         # 조향 및 미션 완료 신호 발행
         self.angle_pub = self.create_publisher(Float32, '/lidar_steer', 10)
@@ -26,9 +33,16 @@ class LidarDriveNode(Node):
         # 중복 발행 방지 플래그
         self.mission_done_flag = False
 
-        self.get_logger().info("✅ LidarDriveNode started (Publishing /lidar_steer & /maze_done)")
+        self.get_logger().info("✅ MazeDriveNode started (Publishing /lidar_steer & /maze_done)")
+
+    def mode_callback(self, msg):
+        self.current_mode = msg.data
 
     def lidar_callback(self, msg):
+        # MAZE 모드가 아닐 때는 계산/발행을 건너뛰어 lidar_drive_node와 /lidar_steer를 동시에
+        # 발행해 조향이 튀는 문제(및 불필요한 CPU 사용)를 막는다.
+        if self.current_mode != MAZE_MODE:
+            return
         if not msg.data:
             return
 
@@ -104,10 +118,11 @@ class LidarDriveNode(Node):
         # ===== 발행 =====
         self.angle_pub.publish(Float32(data=steer_pos * 1.0))
 
-        # ===== 터미널 출력 =====
+        # ===== 터미널 출력 (매 콜백마다 찍으면 라이다 주기만큼 로그가 쌓여 부하가 되므로 1Hz로 제한) =====
         self.get_logger().info(
             f"{state} | angle={steer_pos:.1f}° | "
-            f"L={left_min_val:.2f} R={right_min_val:.2f} C={center_min_val:.2f}"
+            f"L={left_min_val:.2f} R={right_min_val:.2f} C={center_min_val:.2f}",
+            throttle_duration_sec=1.0
         )
 
         # ===== 추가: 미션 완료 신호 발행 =====
@@ -119,7 +134,7 @@ class LidarDriveNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LidarDriveNode()
+    node = MazeDriveNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

@@ -12,22 +12,29 @@ import math
 # 다른 부분에서 저장된 델타값 사용할 수 있도록
 from std_msgs.msg import Float32
 from std_msgs.msg import Bool
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import time
+
+IMAGE_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
 
 
 class LaneDetectionNode(Node):
     def __init__(self):
         super().__init__('stopline_node')
         self.get_logger().info('stopline Node Started!')
-        
+
         self.use_undistort = False
         self.camera_matrix = None
         self.dist_coeffs = None
         # OpenCV Bridge 초기화
         self.bridge = CvBridge()
-        
+
         # 구독자/발행자
-        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, 10)
+        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, IMAGE_QOS)
         #self.stop_find_image_pub = self.create_publisher(Image, '/stop_image', 10)
 
         ### 성민 수정 부분2 
@@ -101,7 +108,8 @@ class LaneDetectionNode(Node):
         # 흰색 정지선 검출
         
         #self.grayimg_pub.publish(self.bridge.cv2_to_imgmsg(gray_img,"mono8"))
-        self.blur_pub.publish(self.bridge.cv2_to_imgmsg(blur_img,"mono8"))
+        if self.blur_pub.get_subscription_count() > 0:
+            self.blur_pub.publish(self.bridge.cv2_to_imgmsg(blur_img,"mono8"))
         #self.graymask_pub.publish(self.bridge.cv2_to_imgmsg(gray_mask,"mono8"))
 
 
@@ -142,7 +150,7 @@ class LaneDetectionNode(Node):
         #self.stop_find_image_pub.publish(result_msg)
         
     
-        self.get_logger().info(f'stop line: {stop_detected}')
+        self.get_logger().info(f'stop line: {stop_detected}', throttle_duration_sec=1.0)
         
 
 

@@ -12,30 +12,38 @@ import numpy as np
 import math
 # 다른 부분에서 저장된 델타값 사용할 수 있도록
 from std_msgs.msg import Float32
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 # try
 import os
 
-# try
+# 카메라 노출은 usb_cam 노드의 ROS 파라미터(autoexposure/exposure)로 한 곳에서만 설정한다.
+# (이 함수를 여러 비전 노드에서 각자 v4l2-ctl로 또 호출하면 서로 다른 값으로 경합하면서
+#  카메라가 느리게 잡히거나 노출이 매번 달라지는 원인이 되었음 — 필요하면 수동 디버깅용으로만 사용)
 def cam_exposure(value=60):
     os.system('v4l2-ctl -d /dev/video0 -c auto_exposure=1')
     os.system('v4l2-ctl -d /dev/video0 -c exposure_dynamic_framerate=0')
     os.system(f'v4l2-ctl -d /dev/video0 -c exposure_time_absolute={value}')
     print(f"[INFO] Camera exposure set to manual ({value})")
 
+# 이미지 토픽은 최신 프레임만 처리하도록 BEST_EFFORT + depth=1 사용.
+# (RELIABLE/depth=10이면 처리가 한 프레임이라도 밀릴 때 큐에 프레임이 쌓여
+#  지연이 계속 누적되는 "렉"이 발생함)
+IMAGE_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
+
 class LaneDetectionNode(Node):
     def __init__(self):
         super().__init__('lane_detection_node')
         self.get_logger().info('Lane Detection Node Started!')
 
-        # try 카메라 노출 고정 (ROS 시작 시 한 번만 실행)
-        cam_exposure(60) 
-        self.get_logger().info('Camera exposure locked to manual mode (80)')
-        
         # OpenCV Bridge 초기화
         self.bridge = CvBridge()
-        
+
         # 구독자/발행자
-        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, 10)
+        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, IMAGE_QOS)
         self.processed_image_pub = self.create_publisher(Image, '/lane_detection/processed_image', 10)
         
         ### 성민 수정 부분2 
@@ -98,11 +106,15 @@ class LaneDetectionNode(Node):
         edge_img_y = cv2.Canny(blur_mask_y, 100, 140)
 
 
-        try:
-            self.blur_pub.publish(self.bridge.cv2_to_imgmsg(blur_mask_y, "mono8"))
-            self.edge_pub.publish(self.bridge.cv2_to_imgmsg(edge_img_y, "mono8"))
-        except Exception as e:
-            self.get_logger().error(f"Error publishing debug images: {e}")
+        # 구독자가 있을 때만 디버그 이미지를 변환/발행 (대회 중에는 보통 아무도 안 봄 → 매 프레임 낭비되는 CPU를 절약)
+        if self.blur_pub.get_subscription_count() > 0 or self.edge_pub.get_subscription_count() > 0:
+            try:
+                if self.blur_pub.get_subscription_count() > 0:
+                    self.blur_pub.publish(self.bridge.cv2_to_imgmsg(blur_mask_y, "mono8"))
+                if self.edge_pub.get_subscription_count() > 0:
+                    self.edge_pub.publish(self.bridge.cv2_to_imgmsg(edge_img_y, "mono8"))
+            except Exception as e:
+                self.get_logger().error(f"Error publishing debug images: {e}")
 
 
 

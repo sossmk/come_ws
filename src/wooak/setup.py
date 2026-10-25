@@ -24,21 +24,19 @@ setup(
         ],
     },
     entry_points={
-        'console_scripts': ['bringup = dyna_lidar_bringup.bringup_main:main',
-            'motor_node = dyna_lidar_bringup.motor_node:main',
-            'odom_node = dyna_lidar_bringup.odom_from_dxl:main',
-            'dyna_cmd_vel_node = dyna_lidar_bringup.dyna_cmd_vel_node:main',
-            'quick_vel_test = dyna_lidar_bringup.quick_vel_test:main',
-            'lidar_array_node = dyna_lidar_bringup.lidar_array_node:main',
-            'scan_to_cmdvel = scan_to_cmdvel:main',
+        'console_scripts': [
             'main_driver = wooak.main_drive_node:main',
             'm2ct = wooak.m2ct:main',
             'stopline_find = wooak.stopline_find:main',
-            'lidar_array.py = wooak.lidar_array:main',
-            'lidar_drive.py = wooak.lidar_drive:main',
-            'maze_drive.py = wooak.maze_drive:main',
-           
-           
+            'lane_detection_node = wooak.lane_detection_node:main',
+            'left_lane_detection_node = wooak.left_lane_detection_node:main',
+            'right_lane_detection_node = wooak.right_lane_detection_node:main',
+            'lidar_array_node = wooak.lidar_array_node:main',
+            'lidar_drive = wooak.lidar_drive:main',
+            'maze_drive = wooak.maze_drive:main',
+            'obstacle_check = wooak.choice:main',
+            'obstacle_check1 = wooak.choice1:main',
+            'obstacle_check2 = wooak.choice2:main',
         ],
     },
 )

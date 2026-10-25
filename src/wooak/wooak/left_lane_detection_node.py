@@ -12,30 +12,34 @@ import numpy as np
 import math
 # 다른 부분에서 저장된 델타값 사용할 수 있도록
 from std_msgs.msg import Float32
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 # 카메라 노출값 조정 관련
 import os
 
-# 카메라 노출값 조정을 위한 세팅
+# 카메라 노출은 usb_cam 노드의 ROS 파라미터(autoexposure/exposure)로 한 곳에서만 설정한다.
+# (여러 비전 노드가 각자 다른 auto_exposure 값으로 v4l2-ctl을 호출하면 서로 경합함 — 수동 디버깅용으로만 사용)
 def cam_exposure(value=60):
     os.system('v4l2-ctl -d /dev/video0 -c auto_exposure=1')
     os.system('v4l2-ctl -d /dev/video0 -c exposure_dynamic_framerate=0')
     os.system(f'v4l2-ctl -d /dev/video0 -c exposure_time_absolute={value}')
     print(f"[INFO] Camera exposure set to manual ({value})")
 
+IMAGE_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
+
 class LaneDetectionNode(Node):
     def __init__(self):
         super().__init__('left_lane_detection_node')
         self.get_logger().info('left_Lane Detection Node Started!')
 
-        # try 카메라 노출 고정 (ROS 시작 시 한 번만 실행)
-        cam_exposure(60) 
-        self.get_logger().info('Camera exposure locked to manual mode (60)')
-        
         # OpenCV Bridge 초기화
         self.bridge = CvBridge()
-        
+
         # 구독자/발행자
-        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, 10)
+        self.image_subscription = self.create_subscription(Image, '/image_raw', self.image_callback, IMAGE_QOS)
         self.left_processed_image_pub = self.create_publisher(Image, '/left_lane_detection/processed_image', 10)
 
         ### 성민 수정 부분2 
@@ -95,9 +99,9 @@ class LaneDetectionNode(Node):
         yellow_enhanced = cv2.subtract(yellow_enhanced, cv2.multiply(b,1.6))
         yellow_enhanced = np.clip(yellow_enhanced,0,255).astype(np.uint8)
         blur_mask_y = cv2.GaussianBlur(yellow_enhanced,(5,5),0)
-        
-        gray_mask = cv2.adaptiveThreshold(blur_mask_y, 255, 
-                                   cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+
+        gray_mask = cv2.adaptiveThreshold(blur_mask_y, 255,
+                                   cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                    cv2.THRESH_BINARY, 55, 16)
         edge_img_y = cv2.Canny(blur_mask_y, 100, 140)
 

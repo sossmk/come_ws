@@ -8,7 +8,7 @@ import math
 
 class LidarObstacleCheckNode(Node):
     def __init__(self):
-        super().__init__('lidar_obstacle_check_node')
+        super().__init__('lidar_obstacle_check_node2')
         self.sub = self.create_subscription(Float32MultiArray, '/lidar_array', self.lidar_callback, 10)
         self.pub = self.create_publisher(Int32, '/obstacle_direction2', 10)
         self.get_logger().info("✅ LidarObstacleCheckNode started (/obstacle_direction)")

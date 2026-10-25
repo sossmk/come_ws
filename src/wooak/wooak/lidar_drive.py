@@ -12,12 +12,19 @@ STEER_CENTER = 800
 STEER_STEP = 3.125   # 인덱스 차이당 조향 변화량
 # =================================
 
+# main_drive_node.py의 모드 상수와 동일해야 함 (CONE 모드일 때만 조향을 발행)
+CONE_MODE = 4
+
 class LidarDriveNode(Node):
     def __init__(self):
         super().__init__('lidar_drive_node')
 
         # LiDAR 배열 구독
         self.sub = self.create_subscription(Float32MultiArray, '/lidar_array', self.lidar_callback, 10)
+
+        # main_drive_node가 현재 모드를 브로드캐스트하는 토픽 (maze_drive와 /lidar_steer 충돌 방지용)
+        self.mode_sub = self.create_subscription(Int32, '/drive_mode', self.mode_callback, 10)
+        self.current_mode = CONE_MODE
 
         # 조향 명령 발행
         self.angle_pub = self.create_publisher(Float32, '/lidar_steer', 10)
@@ -33,7 +40,14 @@ class LidarDriveNode(Node):
 
         self.get_logger().info("✅ LidarDriveNode started (Publishing /lidar_steer, /cone_done & /finish_dir)")
 
+    def mode_callback(self, msg):
+        self.current_mode = msg.data
+
     def lidar_callback(self, msg):
+        # CONE 모드가 아닐 때는 계산/발행을 건너뛰어 maze_drive_node와 /lidar_steer를 동시에
+        # 발행해 조향이 튀는 문제(및 불필요한 CPU 사용)를 막는다.
+        if self.current_mode != CONE_MODE:
+            return
         if not msg.data:
             return
 

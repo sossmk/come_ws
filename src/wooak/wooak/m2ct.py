@@ -66,7 +66,9 @@ class MotorDriverNode(Node):
         angle_gain = 5.0
         self.target_position = (msg.data)
         self.apply_command()
-        self.get_logger().info(f"현재 조향값: {self.target_position:.1f}")
+        # main_drive_node가 20ms(50Hz)마다 각도를 발행하므로, 매번 로그를 찍으면
+        # 시리얼 쓰기 타이밍에 지터를 더할 수 있어 1Hz로 제한한다.
+        self.get_logger().info(f"현재 조향값: {self.target_position:.1f}", throttle_duration_sec=1.0)
 
 
     def speed_callback(self, msg):
